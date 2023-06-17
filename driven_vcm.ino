@@ -4,6 +4,8 @@ const int brake_Pin = 2;                    // Digital brake input pin
 const int reverse_Pin = 3;                  // Digital reverse input pin
 const int pwmPin = 9;                       // PWM output pin
 const int dirPin = 8;                       // Direction output pin
+const int powerButtonPin = 4;               // Digital input pin for turn-on button
+const int hvRelayPin = 5;                   // Digital output pin for HV relay
 const int temperatureSensor1_Pin = A1;      // Analog input pin for temperature sensor 1
 const int temperatureSensor2_Pin = A2;      // Analog input pin for temperature sensor 2
 const int voltageSensor1_Pin = A3;          // Analog input pin for voltage sensor 1
@@ -33,16 +35,20 @@ unsigned long previousSecond = 0;           // Previous second count
 
 unsigned long debounceDelay = 1000;         // Debounce period in milliseconds
 unsigned long reverse_lastDebounceTime = 0; // Time of the last button state change
+unsigned long turnOnDuration = 3000;        // Turn-on duration in milliseconds
+unsigned long turnOnStartTime = 0;          // Start time for turn-on duration
 
 int ledState = LOW;                         // Led status 
 int motor_out = 0;                          // Motor PWM duty cycle             
 
 float filterFactor = 0.2;                   // Filter factor (0.0 - 1.0)
 
-bool brake_signalState = false;             // State of brake signal
+bool brakePressed = false;                  // State of brake signal
+bool turnOnButtonPressed = false;           // Flag to indicate turn-on button press
+bool hvRelayState = false;                  // State of HV relay
 bool reverse_State = false;                 // State of brake signal
-bool reverse_buttonState = LOW;             // Initial state of the button
-bool reverse_lastButtonState = LOW;         // Previous state of the button
+bool reverse_buttonState = false;           // Initial state of the button
+bool reverse_lastButtonState = false;       // Previous state of the button
 
 float throttle_input = 0.0;                 // PID input based on throttle
 float power_input = 0.0;                    // PID input based on power consumption
@@ -51,7 +57,7 @@ float motor_output = 0.0;                   // PID output (0-255)
 float power_threshold = 100;                // Watt Soft limit for power
 float temperature_threshold = 80;           // °C   Hard limit for temperature
 
-float error = 0.0;                           // internal variable
+float error = 0.0;                          // internal variable
 
 // structure for PID 
 struct PIDController {
@@ -83,6 +89,9 @@ void setup()
   pinMode(currentSensor_Pin, INPUT);
   pinMode(motorSpeedSensor_Pin, INPUT);
   pinMode(wheelSpeedSensor_Pin, INPUT);
+  pinMode(powerButtonPin, INPUT);
+  pinMode(hvRelayPin, OUTPUT);
+  digitalWrite(hvRelayPin, LOW);  // Initialize HV relay as OFF
   initializePID(throttle_pid, 1.0, 0.2, 0.5);
   initializePID(power_pid, 0.5, 0.1, 0.3);
   initializePID(temperature_pid, 0.8, 0.3, 0.6);
@@ -147,6 +156,48 @@ void task2()
 
 void task3()
 {
+  // Arming HV system
+  bool brakeState = digitalRead(brake_Pin);
+  // Check if the brake is pressed and latch the brakePressed flag
+  if (brakeState == LOW && !brakePressed) {
+    brakePressed = true;
+  }
+
+  // Read the state of the turn-on button pin
+  bool turnOnButtonState = digitalRead(powerButtonPin);
+
+  // Check if the turn-on button is pressed and start the turn-on timer
+  if (turnOnButtonState == LOW && !turnOnButtonPressed) {
+    turnOnButtonPressed = true;
+    turnOnStartTime = millis();
+  }
+
+  // Check if the brake is released and reset the brakePressed flag
+  if (brakeState == HIGH && brakePressed) {
+    brakePressed = false;
+  }
+
+  // Check if the turn-on button is released and reset the turnOnButtonPressed flag
+  if (turnOnButtonState == HIGH && turnOnButtonPressed) {
+    turnOnButtonPressed = false;
+  }
+
+  // Check if the turn-on duration has elapsed and turn on the HV relay
+  if (turnOnButtonPressed && (millis() - turnOnStartTime >= turnOnDuration)) {
+    hvRelayState = true;
+    digitalWrite(hvRelayPin, HIGH);
+  }
+
+  // Check if the HV relay is ON and the brake is pressed to turn it off
+  if (hvRelayState && brakePressed) {
+    hvRelayState = false;
+    digitalWrite(hvRelayPin, LOW);
+  }
+
+  // Add a small delay to debounce the inputs
+  delay(debounceDelay);
+  
+  // status LED
   if (ledState == LOW) {
     ledState = HIGH;
   }
