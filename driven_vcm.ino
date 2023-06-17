@@ -16,9 +16,9 @@ unsigned long previousMillis1 = 0;         // Previous time for task1
 unsigned long previousMillis2 = 0;         // Previous time for task2
 unsigned long previousMillis3 = 0;         // Previous time for task3
 
-const unsigned long interval1 = 10;        // Task1 interval in milliseconds (100 Hz)
-const unsigned long interval2 = 10;        // Task2 interval in milliseconds (100 Hz)
-const unsigned long interval3 = 10;        // Task3 interval in milliseconds (100 Hz)
+const unsigned long interval1 = 1;        // Task1 interval in milliseconds (1000 Hz)
+const unsigned long interval2 = 10;       // Task2 interval in milliseconds (100 Hz)
+const unsigned long interval3 = 1000;     // Task3 interval in milliseconds (1 Hz)
 
 unsigned long taskTime1 = 0;               // Execution time for task1
 unsigned long taskTime2 = 0;               // Execution time for task2
