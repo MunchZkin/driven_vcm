@@ -1,43 +1,48 @@
-const int ledPin = LED_BUILTIN;            // Digital BuiltIn status LED pin
-const int throttle_Pin = A0;               // Analog throttle input pin
-const int brake_Pin = 2;                   // Digital brake input pin
-const int reverse_Pin = 3;                 // Digital reverse input pin
-const int pwmPin = 9;                      // PWM output pin
-const int dirPin = 8;                      // Direction output pin
-const int temperatureSensor1_Pin = A1;     // Analog input pin for temperature sensor 1
-const int temperatureSensor2_Pin = A2;     // Analog input pin for temperature sensor 2
-const int voltageSensor1_Pin = A3;         // Analog input pin for voltage sensor 1
-const int voltageSensor2_Pin = A4;         // Analog input pin for voltage sensor 2
-const int currentSensor_Pin = A5;          // Analog input pin for current sensor
-const int motorSpeedSensor_Pin = 6;        // Digital input pin for motor speed sensor
-const int wheelSpeedSensor_Pin = 7;        // Digital input pin for wheel speed sensor
+const int ledPin = LED_BUILTIN;             // Digital BuiltIn status LED pin
+const int throttle_Pin = A0;                // Analog throttle input pin
+const int brake_Pin = 2;                    // Digital brake input pin
+const int reverse_Pin = 3;                  // Digital reverse input pin
+const int pwmPin = 9;                       // PWM output pin
+const int dirPin = 8;                       // Direction output pin
+const int temperatureSensor1_Pin = A1;      // Analog input pin for temperature sensor 1
+const int temperatureSensor2_Pin = A2;      // Analog input pin for temperature sensor 2
+const int voltageSensor1_Pin = A3;          // Analog input pin for voltage sensor 1
+const int voltageSensor2_Pin = A4;          // Analog input pin for voltage sensor 2
+const int currentSensor_Pin = A5;           // Analog input pin for current sensor
+const int motorSpeedSensor_Pin = 6;         // Digital input pin for motor speed sensor
+const int wheelSpeedSensor_Pin = 7;         // Digital input pin for wheel speed sensor
 
-unsigned long previousMillis1 = 0;         // Previous time for task1
-unsigned long previousMillis2 = 0;         // Previous time for task2
-unsigned long previousMillis3 = 0;         // Previous time for task3
+unsigned long previousMillis1 = 0;          // Previous time for task1
+unsigned long previousMillis2 = 0;          // Previous time for task2
+unsigned long previousMillis3 = 0;          // Previous time for task3
 
-const unsigned long interval1 = 1;        // Task1 interval in milliseconds (1000 Hz)
-const unsigned long interval2 = 10;       // Task2 interval in milliseconds (100 Hz)
-const unsigned long interval3 = 1000;     // Task3 interval in milliseconds (1 Hz)
+const unsigned long interval1 = 1;          // Task1 interval in milliseconds (1000 Hz)
+const unsigned long interval2 = 10;         // Task2 interval in milliseconds (100 Hz)
+const unsigned long interval3 = 1000;       // Task3 interval in milliseconds (1 Hz)
 
-unsigned long taskTime1 = 0;               // Execution time for task1
-unsigned long taskTime2 = 0;               // Execution time for task2
-unsigned long taskTime3 = 0;               // Execution time for task3
+unsigned long taskTime1 = 0;                // Execution time for task1
+unsigned long taskTime2 = 0;                // Execution time for task2
+unsigned long taskTime3 = 0;                // Execution time for task3
 
-unsigned long overrun1 = 0;                // Number of task1 overruns
-unsigned long overrun2 = 0;                // Number of task2 overruns
-unsigned long overrun3 = 0;                // Number of task3 overruns
+unsigned long overrun1 = 0;                 // Number of task1 overruns
+unsigned long overrun2 = 0;                 // Number of task2 overruns
+unsigned long overrun3 = 0;                 // Number of task3 overruns
 
-unsigned long overrunsPerSecond = 0;       // Total overruns per second
-unsigned long previousSecond = 0;          // Previous second count
+unsigned long overrunsPerSecond = 0;        // Total overruns per second
+unsigned long previousSecond = 0;           // Previous second count
 
-int ledState = LOW;                        // Led status 
-int motor_out = 0;                         // Motor PWM duty cycle             
+unsigned long debounceDelay = 1000;         // Debounce period in milliseconds
+unsigned long reverse_lastDebounceTime = 0; // Time of the last button state change
 
-float filterFactor = 0.2;                  // Filter factor (0.0 - 1.0)
+int ledState = LOW;                         // Led status 
+int motor_out = 0;                          // Motor PWM duty cycle             
 
-bool brake_signalState = false;            // State of brake signal
-bool reverse_latchState = false;           // State of the reverse signal
+float filterFactor = 0.2;                   // Filter factor (0.0 - 1.0)
+
+bool brake_signalState = false;             // State of brake signal
+bool reverse_State = false;                 // State of brake signal
+bool reverse_buttonState = LOW;             // Initial state of the button
+bool reverse_lastButtonState = LOW;         // Previous state of the button
 
 void setup()
 {
@@ -71,6 +76,30 @@ void task1()
 
 void task2()
 {
+  // Reverse Condition
+  int reverse_reading = digitalRead(reverse_Pin);
+
+  // Check if button state has changed
+  if (reverse_reading != reverse_lastButtonState) {
+    reverse_lastDebounceTime = millis();
+  }
+
+  // Check if debounce period has passed
+  if ((millis() - reverse_lastDebounceTime) > debounceDelay) {
+    // Update button state if debounce period has passed
+    if (reverse_reading != reverse_buttonState) {
+      reverse_buttonState = reverse_reading;
+
+      // Toggle reverse switch state when button is pressed
+      if (reverse_buttonState == HIGH) {
+        reverse_State = !reverse_State;
+        digitalWrite(dirPin, reverse_State);
+      }
+    }
+  }
+  reverse_lastButtonState = reverse_reading;
+
+  
   // Read temperature sensor measurements
   float temperature1 = analogRead(temperatureSensor1_Pin);
   float temperature2 = analogRead(temperatureSensor2_Pin);
