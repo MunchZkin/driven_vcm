@@ -44,6 +44,29 @@ bool reverse_State = false;                 // State of brake signal
 bool reverse_buttonState = LOW;             // Initial state of the button
 bool reverse_lastButtonState = LOW;         // Previous state of the button
 
+float throttle_input = 0.0;                 // PID input based on throttle
+float power_input = 0.0;                    // PID input based on power consumption
+float thermal_input = 0.0;                  // PID input based on motor thermals
+float motor_output = 0.0;                   // PID output (0-255)
+float power_threshold = 100;                // Watt Soft limit for power
+float temperature_threshold = 80;           // °C   Hard limit for temperature
+
+float error = 0.0;                           // internal variable
+
+// structure for PID 
+struct PIDController {
+  float previousValue;
+  float integral;
+  float previousError;
+  float Kp;
+  float Ki;
+  float Kd;
+};
+
+PIDController throttle_pid;
+PIDController temperature_pid;
+PIDController power_pid;
+
 void setup()
 {
   Serial.begin(9600);
@@ -60,6 +83,9 @@ void setup()
   pinMode(currentSensor_Pin, INPUT);
   pinMode(motorSpeedSensor_Pin, INPUT);
   pinMode(wheelSpeedSensor_Pin, INPUT);
+  initializePID(throttle_pid, 1.0, 0.2, 0.5);
+  initializePID(power_pid, 0.5, 0.1, 0.3);
+  initializePID(temperature_pid, 0.8, 0.3, 0.6);
   
 }
 
@@ -68,22 +94,21 @@ void task1()
   int v_throttle = analogRead(throttle_Pin);      // Read throttle input
   static float v_throttle_filtered = v_throttle;  // Initialize the filtered value
   v_throttle_filtered = lowPassFilter(v_throttle, v_throttle_filtered);
+  throttle_input = calculatePID(throttle_pid, v_throttle_filtered, 0.0);
     
   // Motor control
-  motor_out = v_throttle_filtered/255;
-  analogWrite(pwmPin, motor_out);  // Set PWM duty cycle to maximum (255)
+  motor_output  = (throttle_input * power_input * thermal_input)*255;
+  analogWrite(pwmPin, motor_output);  // Set PWM duty cycle to maximum (255)
 }
 
 void task2()
 {
   // Reverse Condition
   int reverse_reading = digitalRead(reverse_Pin);
-
   // Check if button state has changed
   if (reverse_reading != reverse_lastButtonState) {
     reverse_lastDebounceTime = millis();
   }
-
   // Check if debounce period has passed
   if ((millis() - reverse_lastDebounceTime) > debounceDelay) {
     // Update button state if debounce period has passed
@@ -99,10 +124,10 @@ void task2()
   }
   reverse_lastButtonState = reverse_reading;
 
-  
   // Read temperature sensor measurements
   float temperature1 = analogRead(temperatureSensor1_Pin);
   float temperature2 = analogRead(temperatureSensor2_Pin);
+  throttle_input = calculatePID(temperature_pid, temperature2, temperature_threshold);
 
   // Read voltage sensor measurements
   float voltage1 = analogRead(voltageSensor1_Pin);
@@ -116,6 +141,7 @@ void task2()
   float wheelSpeed = analogRead(wheelSpeedSensor_Pin);
 
   float power = (voltage1 + voltage2) * current;
+  power_input = calculatePID(power_pid, power, power_threshold);
 
 }
 
@@ -133,6 +159,48 @@ void task3()
 float lowPassFilter(float input, float outputPrev)
 {
   float output = (input * filterFactor) + (outputPrev * (1 - filterFactor));
+  return output;
+}
+
+void initializePID(PIDController& pid, float Kp, float Ki, float Kd) {
+  pid.previousValue = 0.0;
+  pid.integral = 0.0;
+  pid.previousError = 0.0;
+  pid.Kp = Kp;
+  pid.Ki = Ki;
+  pid.Kd = Kd;
+}
+
+float calculatePID(PIDController& pid, float currentValue, float setpoint) {
+  // Error calculation
+  if (setpoint == 0.0){
+    error = currentValue - pid.previousValue;
+  } else {
+    error = setpoint - currentValue;
+  }
+  
+  // Proportional term
+  float P = pid.Kp * error;
+
+  // Integral term (approximation using accumulated error)
+  pid.integral += pid.Ki * error;
+
+  // Derivative term (approximation using difference in error)
+  float derivative = pid.Kd * (error - pid.previousError);
+  pid.previousError = error;
+
+  // Calculate the PID output
+  float output = P + pid.integral + derivative;
+
+  // Update previous value for the next iteration
+  pid.previousValue = currentValue;
+
+  if (output >= 1){
+    output = 1;
+  } else if(output <= 0){
+    output = 0;
+  }
+
   return output;
 }
 
