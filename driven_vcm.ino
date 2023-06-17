@@ -17,12 +17,23 @@ unsigned long overrun3 = 0;  // Number of task3 overruns
 unsigned long overrunsPerSecond = 0;  // Total overruns per second
 unsigned long previousSecond = 0;  // Previous second count
 
-const int ledPin =  LED_BUILTIN;// the number of the LED pin
-int ledState = LOW; 
+// Led Status
+const int ledPin =  LED_BUILTIN;
+int ledState = LOW;
+
+const int throttle_Pin = A0;  // Analog throttle input pin
+const int brake_Pin = 2;  // Analog throttle input pin
+const int reverse_Pin = 3;  // Analog throttle input pin
+const float filterFactor = 0.2;  // Filter factor (0.0 - 1.0)
+
+bool brake_signalState = false;   // State of brake signal
+bool reverse_latchState = false;     // State of the reverse signal
 
 void task1()
 {
-//  1khz task
+  int v_throttle = analogRead(throttle_Pin); // Read throttle input
+  static float v_throttle_filtered = v_throttle;  // Initialize the filtered value
+  v_throttle_filtered = lowPassFilter(v_throttle, v_throttle_filtered);
 }
 
 void task2()
@@ -44,6 +55,12 @@ void statusLED()
     ledState = LOW;
   }
   digitalWrite(ledPin, ledState);
+}
+
+float lowPassFilter(float input, float outputPrev)
+{
+  float output = (input * filterFactor) + (outputPrev * (1 - filterFactor));
+  return output;
 }
 
 void setup()
