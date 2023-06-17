@@ -1,6 +1,9 @@
+const int ledPin = LED_BUILTIN;            // Digital BuiltIn status LED pin
 const int throttle_Pin = A0;               // Analog throttle input pin
 const int brake_Pin = 2;                   // Digital brake input pin
 const int reverse_Pin = 3;                 // Digital reverse input pin
+const int pwmPin = 9;                      // PWM output pin
+const int dirPin = 8;                      // Direction output pin
 const int temperatureSensor1_Pin = A1;     // Analog input pin for temperature sensor 1
 const int temperatureSensor2_Pin = A2;     // Analog input pin for temperature sensor 2
 const int voltageSensor1_Pin = A3;         // Analog input pin for voltage sensor 1
@@ -28,47 +31,66 @@ unsigned long overrun3 = 0;                // Number of task3 overruns
 unsigned long overrunsPerSecond = 0;       // Total overruns per second
 unsigned long previousSecond = 0;          // Previous second count
 
-// Led Status
-const int ledPin = LED_BUILTIN;
-int ledState = LOW;
+int ledState = LOW;                        // Led status 
+int motor_out = 0;                         // Motor PWM duty cycle             
 
 float filterFactor = 0.2;                  // Filter factor (0.0 - 1.0)
 
 bool brake_signalState = false;            // State of brake signal
 bool reverse_latchState = false;           // State of the reverse signal
 
+void setup()
+{
+  Serial.begin(9600);
+  pinMode(ledPin, OUTPUT);
+  pinMode(pwmPin, OUTPUT);
+  pinMode(dirPin, INPUT);
+  pinMode(throttle_Pin, INPUT);
+  pinMode(brake_Pin, INPUT);
+  pinMode(reverse_Pin, INPUT);
+  pinMode(temperatureSensor1_Pin, INPUT);
+  pinMode(temperatureSensor2_Pin, INPUT);
+  pinMode(voltageSensor1_Pin, INPUT);
+  pinMode(voltageSensor2_Pin, INPUT);
+  pinMode(currentSensor_Pin, INPUT);
+  pinMode(motorSpeedSensor_Pin, INPUT);
+  pinMode(wheelSpeedSensor_Pin, INPUT);
+  
+}
 
 void task1()
 {
   int v_throttle = analogRead(throttle_Pin);      // Read throttle input
   static float v_throttle_filtered = v_throttle;  // Initialize the filtered value
   v_throttle_filtered = lowPassFilter(v_throttle, v_throttle_filtered);
+    
+  // Motor control
+  motor_out = v_throttle_filtered/255;
+  analogWrite(pwmPin, motor_out);  // Set PWM duty cycle to maximum (255)
 }
 
 void task2()
 {
   // Read temperature sensor measurements
-  int temperature1 = analogRead(temperatureSensor1_Pin);
-  int temperature2 = analogRead(temperatureSensor2_Pin);
+  float temperature1 = analogRead(temperatureSensor1_Pin);
+  float temperature2 = analogRead(temperatureSensor2_Pin);
 
   // Read voltage sensor measurements
-  int voltage1 = analogRead(voltageSensor1_Pin);
-  int voltage2 = analogRead(voltageSensor2_Pin);
+  float voltage1 = analogRead(voltageSensor1_Pin);
+  float voltage2 = analogRead(voltageSensor2_Pin);
 
   // Read current sensor measurement
-  int current = analogRead(currentSensor_Pin);
+  float current = analogRead(currentSensor_Pin);
 
   // Read wheel speed sensor measurements
-  int motorSpeed = analogRead(motorSpeedSensor_Pin);
-  int wheelSpeed = analogRead(wheelSpeedSensor_Pin);
+  float motorSpeed = analogRead(motorSpeedSensor_Pin);
+  float wheelSpeed = analogRead(wheelSpeedSensor_Pin);
+
+  float power = (voltage1 + voltage2) * current;
+
 }
 
 void task3()
-{
-  statusLED();
-}
-
-void statusLED()
 {
   if (ledState == LOW) {
     ledState = HIGH;
@@ -83,17 +105,6 @@ float lowPassFilter(float input, float outputPrev)
 {
   float output = (input * filterFactor) + (outputPrev * (1 - filterFactor));
   return output;
-}
-
-void setup()
-{
-  Serial.begin(9600);
-  pinMode(ledPin, OUTPUT);
-  pinMode(ledPin, OUTPUT);
-  pinMode(ledPin, OUTPUT);
-  pinMode(ledPin, OUTPUT);
-  pinMode(ledPin, OUTPUT);
-  
 }
 
 void loop()
@@ -150,12 +161,6 @@ void loop()
     overrun1 = 0;
     overrun2 = 0;
     overrun3 = 0;
-    previousSecond = currentSecond;
-    Serial.print(taskTime1);
-    Serial.print(", ");
-    Serial.print(taskTime2);
-    Serial.print(", ");
-    Serial.println(taskTime3);
-    
+    previousSecond = currentSecond;    
   }
 }
