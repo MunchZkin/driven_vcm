@@ -41,7 +41,7 @@ unsigned long turnOnStartTime = 0;          // Start time for turn-on duration
 int ledState = LOW;                         // Led status 
 int motor_out = 0;                          // Motor PWM duty cycle             
 
-float filterFactor = 0.2;                   // Filter factor (0.0 - 1.0)
+float filterFactor = 0.8;                   // Filter factor (0.0 - 1.0)
 
 bool brakePressed = false;                  // State of brake signal
 bool turnOnButtonPressed = false;           // Flag to indicate turn-on button press
@@ -56,6 +56,12 @@ float thermal_input = 0.0;                  // PID input based on motor thermals
 float motor_output = 0.0;                   // PID output (0-255)
 float power_threshold = 100;                // Watt Soft limit for power
 float temperature_threshold = 80;           // °C   Hard limit for temperature
+
+// Floats for resistor values in divider (in ohms)
+float ref_voltage = 5.0;
+float R1 = 30000.0;
+float R2 = 7500.0;
+ 
 
 float error = 0.0;                          // internal variable
 
@@ -101,9 +107,15 @@ void setup()
 void task1()
 {
   int v_throttle = analogRead(throttle_Pin);      // Read throttle input
+  if (v_throttle <= 50) {
+    v_throttle = 0;
+  }
   static float v_throttle_filtered = v_throttle;  // Initialize the filtered value
   v_throttle_filtered = lowPassFilter(v_throttle, v_throttle_filtered);
-  throttle_input = calculatePID(throttle_pid, v_throttle_filtered, 0.0);
+  throttle_input = calculatePID(throttle_pid, (v_throttle_filtered/1000), 0.0);
+
+  // Add a small delay to debounce the inputs
+  delay(debounceDelay);
     
   // Motor control
   motor_output  = (throttle_input * power_input * thermal_input)*255;
@@ -140,8 +152,13 @@ void task2()
 
   // Read voltage sensor measurements
   float voltage1 = analogRead(voltageSensor1_Pin);
+  voltage1 = ((voltage1 * ref_voltage) / 1024.0)/ (R2/(R1+R2));
+  Serial.print(voltage1);
   float voltage2 = analogRead(voltageSensor2_Pin);
-
+  voltage2 = ((voltage2 * ref_voltage) / 1024.0)/ (R2/(R1+R2));
+  Serial.print(',');
+  Serial.println(voltage2);
+  
   // Read current sensor measurement
   float current = analogRead(currentSensor_Pin);
 
@@ -193,9 +210,6 @@ void task3()
     hvRelayState = false;
     digitalWrite(hvRelayPin, LOW);
   }
-
-  // Add a small delay to debounce the inputs
-  delay(debounceDelay);
   
   // status LED
   if (ledState == LOW) {
