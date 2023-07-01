@@ -111,13 +111,11 @@ void task1()
   }
   static float v_throttle_filtered = v_throttle;  // Initialize the filtered value
   v_throttle_filtered = lowPassFilter(v_throttle, v_throttle_filtered);
-  throttle_input = calculatePID(throttle_pid, (v_throttle_filtered/1000), 0.0);
-
-  // Add a small delay to debounce the inputs
-  delay(debounceDelay);
-    
+  throttle_input = calculatePID(throttle_pid, (v_throttle_filtered/1024), 0.0);
+      
   // Motor control
-  motor_output  = (throttle_input * power_input * thermal_input)*255;
+  // motor_output  = (throttle_input * power_input * thermal_input)*255;
+  motor_output = (v_throttle_filtered/1024)*255;
   analogWrite(pwmPin, motor_output);  // Set PWM duty cycle to maximum (255)
 }
 
@@ -143,7 +141,6 @@ void task2()
     }
   }
   reverse_lastButtonState = reverse_reading;
-  Serial.println(reverse_State);
 
   // Read temperature sensor measurements
   float temperature1 = analogRead(temperatureSensor1_Pin);
@@ -156,16 +153,17 @@ void task2()
   float voltage2 = analogRead(voltageSensor2_Pin);
   voltage2 = ((voltage2 * ref_voltage) / 1024.0)/ (R2/(R1+R2));
   
-  // Read current sensor measurement
-  float current = analogRead(currentSensor_Pin);
-
+  // Read current sensor measurement  
+  float adc = analogRead(currentSensor_Pin);     //Read current sensor values
+  float currentVoltage = adc * 5 / 1023.0;
+  float current = (currentVoltage - 2.5) / 0.185;
+  
   // Read wheel speed sensor measurements
   float motorSpeed = analogRead(motorSpeedSensor_Pin);
   float wheelSpeed = analogRead(wheelSpeedSensor_Pin);
-
+  
+  voltage2 = 0.0;
   float power = (voltage1 + voltage2) * current;
-  power_input = calculatePID(power_pid, power, power_threshold);
-
 }
 
 void task3()
@@ -277,7 +275,7 @@ void loop()
     unsigned long startTask1 = millis();
     task1();
     taskTime1 = millis() - startTask1;
-
+    
     if (taskTime1 > interval1)
     {
       overrun1++;
@@ -320,6 +318,6 @@ void loop()
     overrun1 = 0;
     overrun2 = 0;
     overrun3 = 0;
-    previousSecond = currentSecond;    
+    previousSecond = currentSecond;
   }
 }
