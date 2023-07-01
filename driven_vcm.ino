@@ -61,7 +61,6 @@ float temperature_threshold = 80;           // °C   Hard limit for temperature
 float ref_voltage = 5.0;
 float R1 = 30000.0;
 float R2 = 7500.0;
- 
 
 float error = 0.0;                          // internal variable
 
@@ -144,6 +143,7 @@ void task2()
     }
   }
   reverse_lastButtonState = reverse_reading;
+  Serial.println(reverse_State);
 
   // Read temperature sensor measurements
   float temperature1 = analogRead(temperatureSensor1_Pin);
@@ -153,11 +153,8 @@ void task2()
   // Read voltage sensor measurements
   float voltage1 = analogRead(voltageSensor1_Pin);
   voltage1 = ((voltage1 * ref_voltage) / 1024.0)/ (R2/(R1+R2));
-  Serial.print(voltage1);
   float voltage2 = analogRead(voltageSensor2_Pin);
   voltage2 = ((voltage2 * ref_voltage) / 1024.0)/ (R2/(R1+R2));
-  Serial.print(',');
-  Serial.println(voltage2);
   
   // Read current sensor measurement
   float current = analogRead(currentSensor_Pin);
